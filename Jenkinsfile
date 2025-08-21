@@ -24,7 +24,7 @@ pipeline {
     stage('Prepare Python') {
       steps {
         sh '''
-          set -euxo pipefail
+          set -eu
           # Ensure venv module exists (Ubuntu/Debian)
           command -v python3 >/dev/null
           if ! python3 -m venv --help >/dev/null 2>&1; then
