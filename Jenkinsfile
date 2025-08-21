@@ -1,10 +1,5 @@
 pipeline {
-  agent {
-    docker {
-      image 'python:3.12-slim'
-      args '-u'
-    }
-  }
+  agent any
 
   options {
     timestamps()
@@ -13,30 +8,58 @@ pipeline {
   }
 
   environment {
-    PIP_DISABLE_PIP_VERSION_CHECK = '1'
-    PYTHONDONTWRITEBYTECODE = '1'
+    PY = 'python3'
+    VENV = '.venv'
   }
 
   stages {
     stage('Checkout') {
       steps {
         checkout scm
-        sh 'python --version && pip --version'
+        sh 'python3 --version || true'
+        sh 'pip3 --version || true'
       }
     }
-    stage('Install Deps') {
+
+    stage('Prepare Python') {
       steps {
-        sh 'pip install --no-cache-dir -r requirements.txt'
+        sh '''
+          set -euxo pipefail
+          # Ensure venv module exists (Ubuntu/Debian)
+          command -v python3 >/dev/null
+          if ! python3 -m venv --help >/dev/null 2>&1; then
+            echo "Python venv module missing. Install: sudo apt-get update && sudo apt-get install -y python3-venv"
+            exit 1
+          fi
+          # Create venv in workspace (owned by jenkins user)
+          if [ ! -d "${VENV}" ]; then
+            ${PY} -m venv "${VENV}"
+          fi
+          . "${VENV}/bin/activate"
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        '''
       }
     }
+
     stage('Lint') {
       steps {
-        sh 'flake8 src tests'
+        sh '''
+          set -e
+          . "${VENV}/bin/activate"
+          flake8 src tests
+        '''
       }
     }
+
     stage('Test') {
       steps {
-        sh 'mkdir -p reports && pytest -q --junitxml=reports/junit.xml'
+        sh '''
+          set -e
+          . "${VENV}/bin/activate"
+          mkdir -p reports
+          pytest -q --junitxml=reports/junit.xml
+        '''
       }
       post {
         always {
