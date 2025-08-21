@@ -1,27 +1,42 @@
 pipeline {
-  agent any
-  options {
-    ansiColor('xterm'); timestamps(); buildDiscarder(logRotator(numToKeepStr: '20')); disableConcurrentBuilds()
+  agent {
+    docker {
+      image 'python:3.12-slim'
+      args '-u'
+    }
   }
+
+  options {
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    disableConcurrentBuilds()
+  }
+
+  environment {
+    PIP_DISABLE_PIP_VERSION_CHECK = '1'
+    PYTHONDONTWRITEBYTECODE = '1'
+  }
+
   stages {
-    stage('Checkout') { steps { checkout scm } }
+    stage('Checkout') {
+      steps {
+        checkout scm
+        sh 'python --version && pip --version'
+      }
+    }
     stage('Install Deps') {
       steps {
-        sh '''
-          set -e
-          PY=${PYTHON:-python3}
-          $PY -m pip install --user --upgrade pip
-          $PY -m pip install --user -r requirements.txt
-          echo "PATH update hint: ~/.local/bin should be on PATH"
-        '''
+        sh 'pip install --no-cache-dir -r requirements.txt'
       }
     }
     stage('Lint') {
-      steps { sh '~/.local/bin/flake8 src tests || flake8 src tests' }
+      steps {
+        sh 'flake8 src tests'
+      }
     }
     stage('Test') {
       steps {
-        sh 'mkdir -p reports && (~/.local/bin/pytest -q --junitxml=reports/junit.xml || pytest -q --junitxml=reports/junit.xml)'
+        sh 'mkdir -p reports && pytest -q --junitxml=reports/junit.xml'
       }
       post {
         always {
@@ -30,5 +45,10 @@ pipeline {
         }
       }
     }
+  }
+
+  post {
+    success { echo '✅ Build passed!' }
+    failure { echo '❌ Build failed. Check stages above.' }
   }
 }
