@@ -10,6 +10,7 @@ pipeline {
   environment {
     PY = 'python3'
     VENV = '.venv'
+    PYTHONPATH = 'src'
   }
 
   stages {
@@ -25,13 +26,10 @@ pipeline {
       steps {
         sh '''
           set -eu
-          # Ensure venv module exists (Ubuntu/Debian)
-          command -v python3 >/dev/null
           if ! python3 -m venv --help >/dev/null 2>&1; then
-            echo "Python venv module missing. Install: sudo apt-get update && sudo apt-get install -y python3-venv"
+            echo "Install venv: sudo apt-get update && sudo apt-get install -y python3-venv"
             exit 1
           fi
-          # Create venv in workspace (owned by jenkins user)
           if [ ! -d "${VENV}" ]; then
             ${PY} -m venv "${VENV}"
           fi
